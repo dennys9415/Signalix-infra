@@ -1,6 +1,6 @@
 # Signalix Infrastructure
 
-**Version: v0.2.0**
+**Version: v0.5.0**
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -10,11 +10,13 @@ Docker Compose local development setup for Signalix. This is the primary entry p
 |---|---|---|
 | `postgres` | `postgres:16` | 5432 |
 | `flyway` | `flyway/flyway:10` | — |
+| `minio` | `minio/minio:latest` | 9000 (S3 API) / 9001 (console) |
+| `minio-init` | `minio/mc:latest` | — |
 | `api` | built from `Signalix-api/` | 4000 |
 | `realtime` | built from `Signalix-realtime/` | 5000 |
 | `frontend` | built from `Signalix-frontend/` | 3000 |
 
-Startup order: `postgres` (healthy) → `flyway` (migrations complete) → `api` (started) → `realtime`, `frontend`
+Startup order: `postgres` (healthy) + `minio` (healthy) → `flyway` (migrations complete) + `minio-init` (buckets created) → `api` (started) → `realtime`, `frontend`
 
 ## Prerequisites
 
@@ -59,6 +61,8 @@ After startup:
 | API | http://localhost:4000/api/v1 |
 | Realtime WebSocket | ws://localhost:5000 |
 | Postgres | localhost:5432 |
+| MinIO S3 API | http://localhost:9000 |
+| MinIO console | http://localhost:9001 |
 
 ## Environment files
 
@@ -105,6 +109,14 @@ All secrets live in `env/*.env` (git-ignored). The `*.env.example` files documen
 | `APPLE_CALLBACK_URL` | OAuth | **Must be HTTPS** — Apple rejects `http://` |
 | `RESEND_API_KEY` | Email | Leave empty to log email links to the API console instead |
 | `EMAIL_FROM` | no | Sender name/address (default `Signalix <onboarding@resend.dev>`) |
+| `MINIO_ENDPOINT` | **yes** | Internal S3 endpoint reachable by the API container — use `http://minio:9000` |
+| `MINIO_PUBLIC_URL` | **yes** | Externally reachable URL used inside stored URLs (browser-facing) — e.g. `http://localhost:9000` |
+| `MINIO_REGION` | no | Default `us-east-1` |
+| `MINIO_ACCESS_KEY` | **yes** | Must match `MINIO_ROOT_USER` in `postgres.env` / minio service |
+| `MINIO_SECRET_KEY` | **yes** | Must match `MINIO_ROOT_PASSWORD` |
+| `MINIO_BUCKET_AVATARS` | no | Default `signalix-avatars` (auto-created by `minio-init`) |
+| `MINIO_BUCKET_MEDIA` | no | Default `signalix-media` (image messages) |
+| `MINIO_BUCKET_FILES` | no | Default `signalix-files` (file attachments) |
 
 ### `env/realtime.env`
 
@@ -142,6 +154,7 @@ Runtime-only variables for the Next.js standalone server. The `NEXT_PUBLIC_*` UR
 ```bash
 ./scripts/down.sh
 docker volume rm signalix-infra_postgres_data   # drops the entire database
+docker volume rm signalix-infra_minio_data      # drops all avatars / media / files
 ./scripts/up.sh
 ```
 
@@ -157,18 +170,28 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V4__message_deletions.sql` | Per-user soft delete for messages |
 | `V5__password_reset.sql` | Password reset tokens |
 | `V6__email_verification.sql` | Email verification tokens |
+| `V7__chat_deletions.sql` | Per-user chat visibility cutoff for delete-chat-for-me |
+| `V8__message_reactions.sql` | Emoji reactions |
+| `V9__message_reply_forward.sql` | `reply_to_message_id` + `is_forwarded` on `messages` |
+| `V10__link_preview.sql` | `link_preview` JSONB column on `messages` |
+| `V11__read_state.sql` | `chat_read_state` for persistent unread counts |
 
-## v0.2.0 changelog
+## v0.5.0 changelog
 
-### Added
-- `FRONTEND_URL`, `GOOGLE_*`, `GITHUB_*`, `APPLE_*`, `RESEND_API_KEY`, `EMAIL_FROM` variables in `env/api.env.example`
-- Migrations V4–V6 applied automatically on startup
+### Added since v0.2.0
+- **MinIO** S3-compatible object storage service + `minio-init` job that creates the three buckets (`signalix-avatars`, `signalix-media`, `signalix-files`) and applies public-read policies for avatars and media
+- `MINIO_*` env vars in `env/api.env.example`
+- Migrations V7–V11 applied automatically on startup
+
+### v0.5.0 stabilization
+- No infra-level fixes; v0.5.0 stabilization happened in the application services.
 
 ## Known limitations
 
 - **Single instance only.** The realtime service uses in-memory routing. Horizontal scaling requires Redis Pub/Sub (planned).
 - **No nginx / TLS.** Services are exposed directly on localhost ports. Do not expose to the internet without a reverse proxy and TLS termination.
 - **Frontend `NEXT_PUBLIC_*` URLs are build-time constants.** They point to `http://localhost:4000` and `ws://localhost:5000` by default. Changing them requires updating `build.args` in `docker-compose.yml` and rebuilding the `frontend` image.
+- **MinIO `MINIO_PUBLIC_URL`** is baked into stored avatar / media URLs at upload time. Changing it after data has been written invalidates the existing URLs.
 - **Apple OAuth requires HTTPS.** The `APPLE_CALLBACK_URL` must use `https://`. Use a tunnel (e.g. ngrok) for local development.
 - **No health check on `api` or `realtime`.** `frontend` and `realtime` depend on `service_started`, not `service_healthy`. Brief startup races are handled by the services' own retry logic.
 
@@ -176,4 +199,4 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 
 - Redis service for horizontal realtime scaling
 - nginx reverse proxy with TLS
-- Health check endpoints and proper `service_healthy` dependencies
+- Health check endpoints and proper `service_healthy` dependencies for `api` and `realtime`
