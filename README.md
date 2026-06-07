@@ -1,8 +1,8 @@
 # Signalix Infrastructure
 
-**Version: v0.8.0**
+**Version: v0.9.0**
 
-> v0.8.0 only adds migration **V14** (`device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages`). No new services, buckets, or env vars. The new crypto endpoints run inside the existing `api` container. **Scaffolding only — no real E2EE yet.**
+> v0.9.0 reuses the V14 schema from v0.8.0 and turns on real beta E2EE for direct text messages — no new migrations, no new services, no new buckets. **One new frontend build-arg / env var: `NEXT_PUBLIC_E2EE_DEV_FALLBACK`** (default `false`). When `true` the frontend falls back to the v0.8.0 plaintext mock instead of the real Signal service. Wired in `docker-compose.yml` `frontend.build.args` and in `Signalix-frontend/Dockerfile` as an `ARG`/`ENV`.
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -183,6 +183,14 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
 | `V14__crypto_foundation.sql` | `device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages` — scaffolding for future E2EE (v0.8.0). Does not perform encryption. |
+
+## v0.9.0 changelog — Signal Protocol Beta
+
+### Added
+- New frontend build-arg / env var: **`NEXT_PUBLIC_E2EE_DEV_FALLBACK`** (default `false`). When `true` the frontend falls back to the v0.8.0 plaintext-passthrough mock instead of running the v0.9.0 Signal service. Wired into `docker-compose.yml`'s `frontend.build.args` and `Signalix-frontend/Dockerfile` as an `ARG`/`ENV` pair.
+
+### Not changed
+- No new services, buckets, migrations, or other env vars. v0.9.0 reuses the v0.8.0 schema (V14) and the v0.8.0 crypto endpoints — only the frontend behaviour changes.
 
 ## v0.8.0 changelog
 
