@@ -1,6 +1,6 @@
 # Signalix Infrastructure
 
-**Version: v0.6.1**
+**Version: v0.7.0**
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -179,6 +179,15 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V10__link_preview.sql` | `link_preview` JSONB column on `messages` |
 | `V11__read_state.sql` | `chat_read_state` for persistent unread counts |
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
+| `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
+
+## v0.7.0 changelog
+
+### Added
+- Migration **V13** (`chats.avatar_url` + `chats.description`) applied automatically on startup.
+
+### Not changed
+- No new buckets, env vars, or services. Group avatars reuse the existing `signalix-avatars` bucket under the `chats/{chatId}/` key prefix.
 
 ## v0.6.1 changelog
 
