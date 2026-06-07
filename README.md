@@ -1,6 +1,6 @@
 # Signalix Infrastructure
 
-**Version: v0.5.0**
+**Version: v0.6.1**
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -117,6 +117,9 @@ All secrets live in `env/*.env` (git-ignored). The `*.env.example` files documen
 | `MINIO_BUCKET_AVATARS` | no | Default `signalix-avatars` (auto-created by `minio-init`) |
 | `MINIO_BUCKET_MEDIA` | no | Default `signalix-media` (image messages) |
 | `MINIO_BUCKET_FILES` | no | Default `signalix-files` (file attachments) |
+| `VAPID_PUBLIC_KEY` | Push | Generated once via `npx web-push generate-vapid-keys`. Empty disables push. |
+| `VAPID_PRIVATE_KEY` | Push | Pair to the public key — keep secret. |
+| `VAPID_SUBJECT` | no | `mailto:` or HTTPS URL. Default `mailto:admin@signalix.local` |
 
 ### `env/realtime.env`
 
@@ -175,6 +178,28 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V9__message_reply_forward.sql` | `reply_to_message_id` + `is_forwarded` on `messages` |
 | `V10__link_preview.sql` | `link_preview` JSONB column on `messages` |
 | `V11__read_state.sql` | `chat_read_state` for persistent unread counts |
+| `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
+
+## v0.6.1 changelog
+
+### Not changed
+- No infra-level changes for voice messages. Voice notes reuse the existing `signalix-media` bucket under a `voice/{userId}/` key prefix — no new bucket, no new env var, no new service, no migration.
+
+## v0.6.0 changelog
+
+### Added
+- Migration **V12** (`push_subscriptions`) applied automatically on startup
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` env vars in `env/api.env.example`. Leaving the keys empty disables push without erroring the API.
+
+### Generating VAPID keys
+
+```bash
+npx web-push generate-vapid-keys
+# Copy "Public Key" → VAPID_PUBLIC_KEY in env/api.env
+# Copy "Private Key" → VAPID_PRIVATE_KEY in env/api.env
+```
+
+The frontend fetches the public key at runtime via `GET /api/v1/push/public-key`, so no build-arg or rebuild is required to enable/disable push.
 
 ## v0.5.0 changelog
 
