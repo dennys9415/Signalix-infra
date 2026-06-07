@@ -1,6 +1,8 @@
 # Signalix Infrastructure
 
-**Version: v0.7.1**
+**Version: v0.8.0**
+
+> v0.8.0 only adds migration **V14** (`device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages`). No new services, buckets, or env vars. The new crypto endpoints run inside the existing `api` container. **Scaffolding only — no real E2EE yet.**
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -180,6 +182,15 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V11__read_state.sql` | `chat_read_state` for persistent unread counts |
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
+| `V14__crypto_foundation.sql` | `device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages` — scaffolding for future E2EE (v0.8.0). Does not perform encryption. |
+
+## v0.8.0 changelog
+
+### Added
+- Migration **V14** (`device_identity_keys`, `signed_pre_keys`, `pre_keys`, and 5 new columns on `messages`) applied automatically on startup. **Scaffolding only** — v0.8.0 does not perform encryption.
+
+### Not changed
+- No new services, buckets, or env vars. The crypto endpoints run inside the existing `api` container.
 
 ## v0.7.1 changelog
 
