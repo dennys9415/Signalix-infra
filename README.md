@@ -1,6 +1,6 @@
 # Signalix Infrastructure
 
-**Version: v0.7.0**
+**Version: v0.7.1**
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -180,6 +180,11 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V11__read_state.sql` | `chat_read_state` for persistent unread counts |
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
+
+## v0.7.1 changelog
+
+### Not changed
+- Message search (global + in-chat) is REST-only and reuses the existing API container — no new service, bucket, env var, or migration.
 
 ## v0.7.0 changelog
 
