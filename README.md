@@ -1,8 +1,8 @@
 # Signalix Infrastructure
 
-**Version: v0.9.0**
+**Version: v0.9.1**
 
-> v0.9.0 reuses the V14 schema from v0.8.0 and turns on real beta E2EE for direct text messages — no new migrations, no new services, no new buckets. **One new frontend build-arg / env var: `NEXT_PUBLIC_E2EE_DEV_FALLBACK`** (default `false`). When `true` the frontend falls back to the v0.8.0 plaintext mock instead of the real Signal service. Wired in `docker-compose.yml` `frontend.build.args` and in `Signalix-frontend/Dockerfile` as an `ARG`/`ENV`.
+> v0.9.1 is an **infra no-op release**. No new services, no new env vars, no new build-args, no new migrations — same schema (V14), same containers, same ports as v0.9.0. The E2EE-hardening work landed entirely inside `Signalix-api` and `Signalix-frontend`. Rebuild + redeploy the api and frontend images to pick it up.
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -183,6 +183,13 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
 | `V14__crypto_foundation.sql` | `device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages` — scaffolding for future E2EE (v0.8.0). Does not perform encryption. |
+
+## v0.9.1 changelog — E2EE hardening
+
+### Not changed
+- No services added, removed, or rewired. Same Docker Compose topology, same env files, same Flyway migrations as v0.9.0.
+- No new env vars, no new build-args. `NEXT_PUBLIC_E2EE_DEV_FALLBACK` from v0.9.0 remains.
+- No infra-side work to deploy v0.9.1 beyond rebuilding the `api` and `frontend` images.
 
 ## v0.9.0 changelog — Signal Protocol Beta
 
