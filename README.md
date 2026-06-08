@@ -1,8 +1,8 @@
 # Signalix Infrastructure
 
-**Version: v0.9.1**
+**Version: v0.10.1**
 
-> v0.9.1 is an **infra no-op release**. No new services, no new env vars, no new build-args, no new migrations — same schema (V14), same containers, same ports as v0.9.0. The E2EE-hardening work landed entirely inside `Signalix-api` and `Signalix-frontend`. Rebuild + redeploy the api and frontend images to pick it up.
+> v0.10.0 adds **one new Flyway migration** (`V15__group_message_recipients.sql`) for the group E2EE beta. No new services, no new env vars, no new build-args. Same containers + ports as v0.9.x. Rebuild + redeploy the api, realtime, and frontend images after Flyway applies V15.
 
 Docker Compose local development setup for Signalix. This is the primary entry point for running the full stack locally.
 
@@ -183,6 +183,23 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
 | `V14__crypto_foundation.sql` | `device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages` — scaffolding for future E2EE (v0.8.0). Does not perform encryption. |
+
+## v0.10.1 changelog — Hardening + chat-created broadcast (infra no-op)
+
+### Not changed
+- No new services, no new env vars, no new build-args, no new migrations. Same Docker Compose topology, same containers, same ports as v0.10.0.
+- Rebuild + redeploy the `api`, `realtime`, and `frontend` images. `contracts` is build-time only.
+- Deploy order matters: `api` BEFORE `frontend` so the server-side stale-key wipe is in place when each browser triggers its forced cleanup.
+
+## v0.10.0 changelog — Group E2EE beta
+
+### Added
+- **Flyway migration `V15__group_message_recipients.sql`** — picked up automatically by the `flyway` container on the next `up` of the stack. New table, no destructive changes; safe to apply to an existing v0.9.x deployment.
+
+### Not changed
+- Same services, env files, ports, Docker Compose topology as v0.9.x.
+- No new env vars, no new build-args.
+- The realtime, api, and frontend images all need a rebuild to pick up the v0.10.0 code; infra-side wiring is identical.
 
 ## v0.9.1 changelog — E2EE hardening
 
