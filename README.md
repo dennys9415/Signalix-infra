@@ -1,6 +1,6 @@
 # Signalix Infrastructure
 
-**Version: v0.12.0**
+**Version: v0.13.0**
 
 > v0.10.0 adds **one new Flyway migration** (`V15__group_message_recipients.sql`) for the group E2EE beta. No new services, no new env vars, no new build-args. Same containers + ports as v0.9.x. Rebuild + redeploy the api, realtime, and frontend images after Flyway applies V15.
 
@@ -183,6 +183,11 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
 | `V14__crypto_foundation.sql` | `device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages` — scaffolding for future E2EE (v0.8.0). Does not perform encryption. |
+
+## v0.13.0 changelog — Message search (infra no-op)
+
+### Not changed
+- No new services, no new env vars, no migrations. Rebuild + redeploy `api` and `frontend` images to pick up v0.13.0.
 
 ## v0.12.0 changelog — Safety number / device verification UI (infra no-op)
 
