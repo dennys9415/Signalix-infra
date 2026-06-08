@@ -1,6 +1,6 @@
 # Signalix Infrastructure
 
-**Version: v0.10.1**
+**Version: v0.11.0**
 
 > v0.10.0 adds **one new Flyway migration** (`V15__group_message_recipients.sql`) for the group E2EE beta. No new services, no new env vars, no new build-args. Same containers + ports as v0.9.x. Rebuild + redeploy the api, realtime, and frontend images after Flyway applies V15.
 
@@ -183,6 +183,13 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
 | `V14__crypto_foundation.sql` | `device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages` — scaffolding for future E2EE (v0.8.0). Does not perform encryption. |
+
+## v0.11.0 changelog — Media / file / voice E2EE beta (infra no-op)
+
+### Not changed
+- No new services, no new env vars, no new build-args, no new migrations.
+- Encrypted attachments add a new object key prefix `encrypted/{userId}/{uuid}.bin` under the existing MinIO media bucket. No bucket-level policy change required.
+- Rebuild + redeploy `api` and `frontend` images. `contracts` is build-time only; `realtime` and `infra` are no-ops for this release.
 
 ## v0.10.1 changelog — Hardening + chat-created broadcast (infra no-op)
 
