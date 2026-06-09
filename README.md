@@ -1,6 +1,6 @@
 # Signalix Infrastructure
 
-**Version: v0.15.0**
+**Version: v0.16.0**
 
 > v0.10.0 adds **one new Flyway migration** (`V15__group_message_recipients.sql`) for the group E2EE beta. No new services, no new env vars, no new build-args. Same containers + ports as v0.9.x. Rebuild + redeploy the api, realtime, and frontend images after Flyway applies V15.
 
@@ -183,6 +183,11 @@ Migrations are managed by Flyway and live in `Signalix-api/migrations/`. Never e
 | `V12__push_subscriptions.sql` | `push_subscriptions` — Web Push device subscriptions (one row per user × endpoint) |
 | `V13__chats_avatar_description.sql` | `chats.avatar_url` + `chats.description` — group avatar URL and editable description (v0.7.0) |
 | `V14__crypto_foundation.sql` | `device_identity_keys`, `signed_pre_keys`, `pre_keys` + 5 envelope columns on `messages` — scaffolding for future E2EE (v0.8.0). Does not perform encryption. |
+
+## v0.16.0 changelog — Mobile foundation MVP (infra no-op)
+
+### Not changed
+- v0.16.0 introduces the new `Signalix-mobile` repository. The mobile app talks to the existing `api` + `realtime` services and is not part of the Docker Compose stack — no new services, no env var changes, no migrations. For local development, the Android emulator reaches the host stack via `http://10.0.2.2:4000` / `ws://10.0.2.2:5000` (configured in `Signalix-mobile/app.json`).
 
 ## v0.15.0 changelog — Key backup & device recovery (infra no-op)
 
