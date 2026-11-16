@@ -1,0 +1,177 @@
+# Signalix — production stack for Coolify (Docker Compose service).
+#
+# Images come prebuilt from GHCR (built by each repo's GitHub Actions), so the
+# server never compiles anything. Domains are attached per service in Coolify
+# (POST /services `urls`, or the UI), e.g.:
+#   frontend → https://signalix.example.com:3000
+#   api      → https://signalix-api.example.com:4000
+#   realtime → https://signalix-ws.example.com:5000
+#   minio    → https://signalix-files.example.com:9000
+# coturn publishes its ports on the host directly (UDP can't go through
+# Traefik); point a DNS-only record at the server for TURN_HOST and open
+# UDP+TCP 3478 and UDP 49160-49200 in the cloud firewall.
+#
+# Note: the frontend bakes NEXT_PUBLIC_API_URL / NEXT_PUBLIC_WS_URL at build
+# time (Signalix-frontend workflow vars) — they must match the api/realtime
+# domains above.
+#
+# Required variables (set in Coolify → Environment Variables):
+#   IMAGE_TAG, PUBLIC_WEB_URL, PUBLIC_FILES_URL, TURN_HOST, TURN_EXTERNAL_IP,
+#   POSTGRES_PASSWORD, JWT_SECRET, MINIO_ROOT_PASSWORD, TURN_SECRET
+# Optional: RESEND_API_KEY, EMAIL_FROM, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
+#   VAPID_SUBJECT, GOOGLE_*/GITHUB_* OAuth (left as "disabled" placeholders).
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: signalix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: signalix
+    volumes:
+      - signalix-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U signalix -d signalix"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  flyway:
+    image: ghcr.io/dennys9415/signalix-flyway:${IMAGE_TAG:-dev}
+    command: migrate
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/signalix
+      FLYWAY_USER: signalix
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    labels:
+      - coolify.exclude_from_hc=true
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: signalix
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - signalix-minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  createbuckets:
+    image: pgsty/mc:RELEASE.2026-11-12T00-00-00Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 signalix $${MINIO_ROOT_PASSWORD} &&
+      for b in signalix-avatars signalix-media signalix-files; do
+        mc mb --ignore-existing local/$$b && mc anonymous set download local/$$b;
+      done && echo 'Buckets ready.'"
+    environment:
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    restart: "no"
+    labels:
+      - coolify.exclude_from_hc=true
+
+  coturn:
+    image: coturn/coturn:4.6
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-port=3478
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET}
+      - --realm=${TURN_HOST}
+      - --external-ip=${TURN_EXTERNAL_IP}
+      - --min-port=49160
+      - --max-port=49200
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+    restart: unless-stopped
+    labels:
+      - coolify.exclude_from_hc=true
+
+  api:
+    image: ghcr.io/dennys9415/signalix-api:${IMAGE_TAG:-dev}
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: postgres://signalix:${POSTGRES_PASSWORD}@postgres:5432/signalix
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRES_IN: 1h
+      JWT_REFRESH_EXPIRES_IN: 30d
+      FRONTEND_URL: ${PUBLIC_WEB_URL}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-disabled}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-disabled}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-disabled}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-disabled}
+      APPLE_CLIENT_ID: disabled
+      APPLE_TEAM_ID: disabled
+      APPLE_KEY_ID: disabled
+      APPLE_PRIVATE_KEY: disabled
+      APPLE_CALLBACK_URL: disabled
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-Signalix <onboarding@resend.dev>}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_URL: ${PUBLIC_FILES_URL}
+      MINIO_REGION: us-east-1
+      MINIO_ACCESS_KEY: signalix
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET_AVATARS: signalix-avatars
+      MINIO_BUCKET_MEDIA: signalix-media
+      MINIO_BUCKET_FILES: signalix-files
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      ICE_STUN_URLS: stun:${TURN_HOST}:3478
+      TURN_URLS: turn:${TURN_HOST}:3478?transport=udp,turn:${TURN_HOST}:3478?transport=tcp
+      TURN_SECRET: ${TURN_SECRET}
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+      createbuckets:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  realtime:
+    image: ghcr.io/dennys9415/signalix-realtime:${IMAGE_TAG:-dev}
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      JWT_SECRET: ${JWT_SECRET}
+      API_BASE_URL: http://api:4000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/dennys9415/signalix-frontend:${IMAGE_TAG:-dev}
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      - api
+      - realtime
+    restart: unless-stopped
+
+volumes:
+  signalix-postgres:
+  signalix-minio:
