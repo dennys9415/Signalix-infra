@@ -24,7 +24,7 @@ services:
         condition: service_healthy
 
   minio:
-    image: minio/minio:latest
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: signalix
@@ -42,7 +42,7 @@ services:
     restart: unless-stopped
 
   createbuckets:
-    image: minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-11-12T00-00-00Z
     depends_on:
       minio:
         condition: service_healthy
@@ -57,11 +57,48 @@ services:
       mc anonymous set download local/signalix-files &&
       echo 'Buckets ready.'"
 
+  # v0.17.0 — STUN/TURN for WebRTC calls. Media between browsers relays
+  # through here when a direct P2P path isn't possible (symmetric NAT,
+  # mobile carriers, corporate firewalls). Credentials are short-lived
+  # HMACs minted by the API (GET /api/v1/calls/ice-servers) from the same
+  # TURN_SECRET. TURN_EXTERNAL_IP must be an address browsers can reach:
+  # 127.0.0.1 for same-machine testing, the host LAN IP for other devices,
+  # the public IP in production.
+  coturn:
+    image: coturn/coturn:4.6
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-port=3478
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:-signalix_turn_secret_local}
+      - --realm=signalix.local
+      - --external-ip=${TURN_EXTERNAL_IP:-127.0.0.1}
+      - --min-port=49160
+      - --max-port=49200
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      # Local dev only: lets two browsers on the same machine relay to each other.
+      - --allow-loopback-peers
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+    restart: unless-stopped
+
   api:
     build:
       context: ..
       dockerfile: Signalix-api/Dockerfile
     env_file: env/api.env
+    # v0.17.0 — ICE servers handed to call clients. Kept here (not in
+    # api.env) so TURN_SECRET has a single source shared with coturn.
+    environment:
+      ICE_STUN_URLS: stun:${TURN_EXTERNAL_IP:-localhost}:3478
+      TURN_URLS: turn:${TURN_EXTERNAL_IP:-localhost}:3478?transport=udp,turn:${TURN_EXTERNAL_IP:-localhost}:3478?transport=tcp
+      TURN_SECRET: ${TURN_SECRET:-signalix_turn_secret_local}
     ports:
       - "4000:4000"
     depends_on:

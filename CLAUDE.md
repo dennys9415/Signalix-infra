@@ -20,6 +20,7 @@ This is `Signalix-infra`, the Docker Compose local development setup for Signali
 | api      | built from workspace root   | 4000  |
 | realtime | built from workspace root   | 5000  |
 | frontend | built from workspace root   | 3000  |
+| coturn   | coturn/coturn:4.6           | 3478 + 49160-49200/udp |
 
 ### frontend build args
 

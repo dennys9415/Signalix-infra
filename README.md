@@ -12,11 +12,16 @@ Docker Compose local development setup for Signalix. This is the primary entry p
 |---|---|---|
 | `postgres` | `postgres:16` | 5432 |
 | `flyway` | `flyway/flyway:10` | — |
-| `minio` | `minio/minio:latest` | 9000 (S3 API) / 9001 (console) |
-| `minio-init` | `minio/mc:latest` | — |
+| `minio` | `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` | 9000 (S3 API) / 9001 (console) |
+| `createbuckets` | `pgsty/mc:RELEASE.2026-11-12T00-00-00Z` | — |
 | `api` | built from `Signalix-api/` | 4000 |
 | `realtime` | built from `Signalix-realtime/` | 5000 |
 | `frontend` | built from `Signalix-frontend/` | 3000 |
+| `coturn` | `coturn/coturn:4.6` | 3478 udp/tcp (STUN/TURN), 49160-49200 udp (relay) |
+
+MinIO stopped publishing `minio/minio` and `minio/mc` on Docker Hub, so the
+stack uses the community-maintained [Pigsty](https://hub.docker.com/u/pgsty) builds
+(same binaries and CLI). Tags are pinned; bump them deliberately.
 
 Startup order: `postgres` (healthy) + `minio` (healthy) → `flyway` (migrations complete) + `minio-init` (buckets created) → `api` (started) → `realtime`, `frontend`
 
@@ -131,6 +136,26 @@ All secrets live in `env/*.env` (git-ignored). The `*.env.example` files documen
 | `PORT` | no | WebSocket listen port (default `5000`) |
 | `JWT_SECRET` | **yes** | Must match `api.env` |
 | `API_BASE_URL` | **yes** | API address reachable by the realtime container — use `http://api:4000` |
+
+### Calls: STUN / TURN (`coturn`)
+
+Voice and video calls use WebRTC. `coturn` provides STUN and relays media
+when browsers can't connect directly. The API hands out short-lived TURN
+credentials (`GET /api/v1/calls/ice-servers`) signed with the same secret.
+
+These are set in `docker-compose.yml` (not in `env/`) so the secret has a
+single source shared by `coturn` and `api`. Override them from your shell
+or a `.env` file next to `docker-compose.yml`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `TURN_SECRET` | `signalix_turn_secret_local` | Shared HMAC secret. **Change it outside local dev.** |
+| `TURN_EXTERNAL_IP` | `127.0.0.1` | Address browsers use to reach TURN: `127.0.0.1` for same-machine testing, your LAN IP to test from a phone/other computer, the public IP in production. |
+
+The API also accepts `ICE_STUN_URLS`, `TURN_URLS`, `TURN_SECRET` and
+`TURN_TTL_SECONDS` when run outside Docker (see `Signalix-api/src/config/config.service.ts`).
+`--allow-loopback-peers` is enabled for local dev only; remove it in production.
+Browsers only allow camera/microphone on `https://` or `localhost`.
 
 ### `env/frontend.env`
 
